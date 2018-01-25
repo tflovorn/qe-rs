@@ -1,3 +1,4 @@
+use std::fmt;
 use std::path::PathBuf;
 
 /// Representation of the input file for Quantum Espresso 6.2.
@@ -41,9 +42,19 @@ pub struct Input {
 }
 
 pub enum Calculation {
-    Scf {conv_thr: f64},
-    Nscf {diago_thr_init: f64, nbnd: Option<u64>, nosym: Option<bool>},
-    Bands {diago_thr_init: f64, nbnd: Option<u64>, nosym: Option<bool>},
+    Scf {
+        conv_thr: f64,
+    },
+    Nscf {
+        diago_thr_init: f64,
+        nbnd: Option<u64>,
+        nosym: Option<bool>,
+    },
+    Bands {
+        diago_thr_init: f64,
+        nbnd: Option<u64>,
+        nosym: Option<bool>,
+    },
 }
 
 pub struct Control {
@@ -70,8 +81,6 @@ pub enum DiskIO {
 pub struct System {
     pub ibrav: Ibrav,
     pub alat: f64,
-    //pub nat: u64, // obtain from positions list
-    //pub ntyp: u64, // obtain from species list
     pub ecutwfc: f64,
     pub ecutrho: f64,
     pub occupations: Occupations,
@@ -137,16 +146,24 @@ pub enum Smearing {
 pub enum SpinType {
     NonPolarized,
     CollinearPolarized,
-    Noncollinear {spin_orbit: bool},
+    Noncollinear { spin_orbit: bool },
 }
 
 pub enum Efield {
-    TeField {dipfield: bool, edir: LatticeDirection, emaxpos: f64, eopreg: f64, eamp: f64,},
+    TeField {
+        dipfield: bool,
+        edir: LatticeDirection,
+        emaxpos: f64,
+        eopreg: f64,
+        eamp: f64,
+    },
     //LelField,
 }
 
 pub enum LatticeDirection {
-    D1, D2, D3,
+    D1,
+    D2,
+    D3,
 }
 
 pub struct Electrons {
@@ -205,10 +222,16 @@ pub struct AtomCoordinate {
 pub enum KPoints {
     //TwoPiByACartesian(Vec<[f64; 4]>),
     Crystal(Vec<[f64; 4]>),
-    Automatic { nk: [f64; 3], sk: [f64; 3], },
+    Automatic {
+        nk: [f64; 3],
+        sk: [f64; 3],
+    },
     //Gamma,
     //TwoPiByACartesianBands { nk_per_panel: u64, panel_bounds: Vec<f64; 3]> },
-    CrystalBands { nk_per_panel: u64, panel_bounds: Vec<[f64; 3]> },
+    CrystalBands {
+        nk_per_panel: u64,
+        panel_bounds: Vec<[f64; 3]>,
+    },
     //TwoPiByACartesianContour([[f64; 3]; 3]),
     //CrystalContour([[f64; 3]; 3]),
 }
@@ -216,55 +239,55 @@ pub enum KPoints {
 /// Some required properties of the `Input` cannot be conveniently encoded in the type system
 /// and must be checked at runtime. If any properties do not have the required form, return
 /// a corresponding `Error` for each of them; otherwise return `Ok`.
-pub fn validate(input: Input) -> Result<(), Vec<InputError>> {
+pub fn validate(input: &Input) -> Result<(), ErrorList> {
     let mut errs = Vec::new();
-    let system = input.system;
+    let system = &input.system;
 
     // Lattice constant must be positive.
     if system.alat <= 0.0 {
-        errs.push(InputError::LatticeConstant(system.alat));
+        errs.push(Error::LatticeConstant(system.alat));
     }
 
     // Check that `conv_thr` or `diago_thr_init` are positive.
     match input.calculation {
-        Calculation::Scf {conv_thr} => {
+        Calculation::Scf { conv_thr } => {
             if conv_thr <= 0.0 {
-                errs.push(InputError::ConvThr(conv_thr));
+                errs.push(Error::ConvThr(conv_thr));
             }
-        },
+        }
         Calculation::Nscf { diago_thr_init, .. } | Calculation::Bands { diago_thr_init, .. } => {
             if diago_thr_init <= 0.0 {
-                errs.push(InputError::DiagoThrInit(diago_thr_init));
+                errs.push(Error::DiagoThrInit(diago_thr_init));
             }
         }
     }
 
     // Check that ecutwfc and ecutrho are positive.
     if system.ecutwfc <= 0.0 {
-        errs.push(InputError::Ecutwfc(system.ecutwfc));
+        errs.push(Error::Ecutwfc(system.ecutwfc));
     }
     if system.ecutrho <= 0.0 {
-        errs.push(InputError::Ecutrho(system.ecutrho));
+        errs.push(Error::Ecutrho(system.ecutrho));
     }
 
-    // TODO - would be very nice to have, but not simple to fit in since we don't
-    // have an explicit statement of the type of pseudopotential:
+    // TODO (would be very nice to have, but not simple to fit in since we don't
+    // have an explicit statement of the type of pseudopotential):
     // Check that ecutrho is consistent with ecutwfc, according to the pseudopotential type.
-    // For NC PP, should have ecutrho = 4 * ecutwfc.
+    // For NC PP, should always have ecutrho = 4 * ecutwfc.
     // For US PP and PAW, should have ecutrho \approx (8 to 12) * ecutwfc.
     // Could implement by extracting the pseudopotential header (UPF format).
 
     // Check that smearing, if present, is positive.
     if let Occupations::Smearing(_, degauss) = system.occupations {
         if degauss <= 0.0 {
-            errs.push(InputError::Smearing(degauss));
+            errs.push(Error::Smearing(degauss));
         }
     }
 
     // Check that masses are positive.
-    for species in input.species {
+    for species in &input.species {
         if species.mass <= 0.0 {
-            errs.push(InputError::Mass(species.label.clone(), species.mass));
+            errs.push(Error::Mass(species.label.clone(), species.mass));
         }
     }
 
@@ -283,12 +306,12 @@ pub fn validate(input: Input) -> Result<(), Vec<InputError>> {
     if errs.len() == 0 {
         Ok(())
     } else {
-        Err(errs)
+        Err(ErrorList { errs })
     }
 }
 
 #[derive(Fail, Debug)]
-pub enum InputError {
+pub enum Error {
     #[fail(display = "Lattice constant `alat` must be positive; got {} instead.", _0)]
     LatticeConstant(f64),
     #[fail(display = "SCF convergence threshold `conv_thr` must be positive; got {} instead.", _0)]
@@ -305,4 +328,23 @@ pub enum InputError {
     Mass(String, f64),
     #[fail(display = "Species {} in coordinate list is not given in species list.", _0)]
     Species(String),
+}
+
+#[derive(Fail, Debug)]
+pub struct ErrorList {
+    errs: Vec<Error>,
+}
+
+impl fmt::Display for ErrorList {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.errs
+                .iter()
+                .map(|e| format!("{}", e))
+                .collect::<Vec<String>>()
+                .join("\n")
+        )
+    }
 }
