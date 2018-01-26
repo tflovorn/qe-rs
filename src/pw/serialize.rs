@@ -3,14 +3,16 @@ use std::io;
 use std::io::Write;
 use std::fs::File;
 use pw::input;
-use pw::input::{Calculation, DiskIO, Efield, Input, RestartMode};
+use pw::input::{Calculation, DiskIO, Efield, Ibrav, Input, LatticeDirection, Occupations,
+                RestartMode, SpinType};
 
 pub fn make_input_file(input: &Input) -> Result<String, Error> {
     input::validate(&input)?;
 
     let control = make_control(&input)?;
+    let system = make_system(&input);
 
-    let input_text = [control].join("\n");
+    let input_text = [control, system].join("\n");
 
     return Ok(input_text);
 }
@@ -66,6 +68,59 @@ fn push_bool_field(lines: &mut Vec<String>, name: &str, b: Option<bool>) {
 
         lines.push(format!("    {}={},", name, val));
     };
+}
+
+fn make_system(input: &Input) -> String {
+    let mut lines = Vec::new();
+    lines.push(String::from(" &system"));
+
+    let system = &input.system;
+
+    lines.push(format!("    ibrav={},", system.ibrav.value()));
+    lines.push(format!("    celldm(1)={},", system.alat));
+
+    let nat = input.atomic_positions.coordinates.len();
+    lines.push(format!("    nat={},", nat));
+
+    let ntyp = input.species.len();
+    lines.push(format!("    ntyp={},", ntyp));
+
+    lines.push(format!("    ecutwfc={},", system.ecutwfc));
+    lines.push(format!("    ecutrho={},", system.ecutrho));
+
+    lines.push(format!("    occupations='{}',", system.occupations.value()));
+
+    if let Some(ref spin_type) = system.spin_type {
+        match *spin_type {
+            SpinType::NonPolarized => {
+                lines.push(format!("    nspin=1,"));
+            }
+            SpinType::CollinearPolarized => {
+                lines.push(format!("    nspin=2,"));
+            }
+            SpinType::Noncollinear { spin_orbit } => {
+                lines.push(format!("    noncolin=.true.,"));
+                push_bool_field(&mut lines, "lspinorb", Some(spin_orbit));
+            }
+        };
+    };
+
+    if let Some(Efield::TeField {
+        ref edir,
+        emaxpos,
+        eopreg,
+        eamp,
+        ..
+    }) = input.efield
+    {
+        lines.push(format!("    edir={},", edir.value()));
+        lines.push(format!("    emaxpos={},", emaxpos));
+        lines.push(format!("    eopreg={},", eopreg));
+        lines.push(format!("    eamp={},", eamp));
+    };
+
+    lines.push(String::from(" /"));
+    lines.join("\n")
 }
 
 pub fn write_input_file<P: AsRef<Path>>(input: &Input, file_path: P) -> Result<(), Error> {
@@ -129,6 +184,36 @@ impl Field for DiskIO {
             DiskIO::Medium => "medium",
             DiskIO::High => "high",
             DiskIO::NoDiskIO => "none",
+        })
+    }
+}
+
+impl Field for LatticeDirection {
+    fn value(&self) -> String {
+        String::from(match *self {
+            LatticeDirection::D1 => "1",
+            LatticeDirection::D2 => "2",
+            LatticeDirection::D3 => "3",
+        })
+    }
+}
+
+impl Field for Ibrav {
+    fn value(&self) -> String {
+        String::from(match *self {
+            Ibrav::Free(_) => "0",
+        })
+    }
+}
+
+impl Field for Occupations {
+    fn value(&self) -> String {
+        String::from(match *self {
+            Occupations::Smearing(_, _) => "smearing",
+            Occupations::Tetrahedra => "tetrahedra",
+            Occupations::TetrahedraLin => "tetrahedra_lin",
+            Occupations::TetrahedraOpt => "tetrahedra_opt",
+            Occupations::Fixed => "fixed",
         })
     }
 }
