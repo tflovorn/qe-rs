@@ -3,16 +3,30 @@ use std::io;
 use std::io::Write;
 use std::fs::File;
 use pw::input;
-use pw::input::{Calculation, DiskIO, Efield, Ibrav, Input, LatticeDirection, Occupations,
-                RestartMode, SpinType};
+use pw::input::{Calculation, Diagonalization, DiskIO, Efield, Ibrav, Input, KPoints,
+                LatticeDirection, LatticeUnits, Occupations, PositionCoordinateType, RestartMode,
+                SpinType, StartingWfc};
 
 pub fn make_input_file(input: &Input) -> Result<String, Error> {
     input::validate(&input)?;
 
     let control = make_control(&input)?;
     let system = make_system(&input);
+    let electrons = make_electrons(&input);
+    let species = make_species(&input);
+    let cell = make_cell(&input);
+    let positions = make_positions(&input);
+    let k_points = make_k_points(&input);
 
-    let input_text = [control, system].join("\n");
+    let mut input_sections = vec![control, system, electrons, species];
+
+    if let Some(cell) = cell {
+        input_sections.push(cell)
+    }
+
+    input_sections.extend(vec![positions, k_points]);
+
+    let input_text = input_sections.join("\n");
 
     return Ok(input_text);
 }
@@ -116,11 +130,149 @@ fn make_system(input: &Input) -> String {
         lines.push(format!("    edir={},", edir.value()));
         lines.push(format!("    emaxpos={},", emaxpos));
         lines.push(format!("    eopreg={},", eopreg));
-        lines.push(format!("    eamp={},", eamp));
+        lines.push(format!("    eamp={:e},", eamp));
     };
 
     lines.push(String::from(" /"));
     lines.join("\n")
+}
+
+fn make_electrons(input: &Input) -> String {
+    let mut lines = Vec::new();
+    lines.push(String::from(" &electrons"));
+
+    let electrons = &input.electrons;
+
+    if let Some(ref startingwfc) = electrons.startingwfc {
+        lines.push(format!("    startingwfc='{}',", startingwfc.value()));
+    };
+
+    if let Some(ref diagonalization) = electrons.diagonalization {
+        lines.push(format!(
+            "    diagonalization='{}',",
+            diagonalization.value()
+        ));
+    };
+
+    match input.calculation {
+        Calculation::Scf { conv_thr } => {
+            lines.push(format!("    conv_thr={:e},", conv_thr));
+        }
+        Calculation::Nscf { diago_thr_init, .. } | Calculation::Bands { diago_thr_init, .. } => {
+            lines.push(format!("    diago_thr_init={:e},", diago_thr_init));
+        }
+    }
+
+    lines.push(String::from(" /"));
+    lines.join("\n")
+}
+
+fn make_species(input: &Input) -> String {
+    let mut lines = Vec::new();
+    lines.push(String::from("ATOMIC_SPECIES"));
+
+    for species in &input.species {
+        lines.push(format!(
+            " {} {} {}",
+            species.label, species.mass, species.pseudopotential_filename
+        ));
+    }
+
+    lines.join("\n")
+}
+
+fn make_cell(input: &Input) -> Option<String> {
+    match &input.system.ibrav {
+        &Ibrav::Free(ref cell) => {
+            let mut lines = Vec::new();
+
+            lines.push(format!("CELL_PARAMETERS {}", cell.units.value()));
+
+            for latvec in cell.cell.iter() {
+                lines.push(format!(" {} {} {}", latvec[0], latvec[1], latvec[2]));
+            }
+
+            Some(lines.join("\n"))
+        }
+    }
+}
+
+fn make_positions(input: &Input) -> String {
+    let mut lines = Vec::new();
+
+    let positions = &input.atomic_positions;
+
+    lines.push(format!(
+        "ATOMIC_POSITIONS {}",
+        positions.coordinate_type.value()
+    ));
+
+    for coord in &positions.coordinates {
+        if let Some(if_pos) = coord.if_pos {
+            let r = coord.r;
+            lines.push(format!(
+                " {} {} {} {} {}",
+                coord.species,
+                r[0],
+                r[1],
+                r[2],
+                render_bool_list(if_pos)
+            ));
+        } else {
+            let r = coord.r;
+            lines.push(format!(" {} {} {} {}", coord.species, r[0], r[1], r[2]));
+        }
+    }
+
+    lines.join("\n")
+}
+
+fn make_k_points(input: &Input) -> String {
+    let mut lines = Vec::new();
+    lines.push(format!("K_POINTS {}", input.k_points.value()));
+
+    match &input.k_points {
+        &KPoints::Crystal(ref k_points) => {
+            lines.push(format!("{}", k_points.len()));
+
+            for kw in k_points {
+                lines.push(format!("{} {} {} {}", kw[0], kw[1], kw[2], kw[3]));
+            }
+        }
+        &KPoints::Automatic { nk, sk } => {
+            let sk_str = match sk {
+                Some(sk) => render_bool_list(sk),
+                None => render_bool_list([false, false, false]),
+            };
+            lines.push(format!("{} {} {} {}", nk[0], nk[1], nk[2], sk_str));
+        }
+        &KPoints::CrystalBands {
+            nk_per_panel,
+            ref panel_bounds,
+        } => {
+            lines.push(format!("{}", panel_bounds.len()));
+
+            for k in panel_bounds {
+                lines.push(format!("{} {} {} {}", k[0], k[1], k[2], nk_per_panel));
+            }
+        }
+    }
+
+    lines.join("\n")
+}
+
+fn render_bool_list(xs: [bool; 3]) -> String {
+    let mut result = Vec::new();
+
+    for x in xs.iter() {
+        if *x {
+            result.push("1");
+        } else {
+            result.push("0");
+        }
+    }
+
+    result.join(" ")
 }
 
 pub fn write_input_file<P: AsRef<Path>>(input: &Input, file_path: P) -> Result<(), Error> {
@@ -214,6 +366,58 @@ impl Field for Occupations {
             Occupations::TetrahedraLin => "tetrahedra_lin",
             Occupations::TetrahedraOpt => "tetrahedra_opt",
             Occupations::Fixed => "fixed",
+        })
+    }
+}
+
+impl Field for StartingWfc {
+    fn value(&self) -> String {
+        String::from(match *self {
+            StartingWfc::Atomic => "atomic",
+            StartingWfc::AtomicPlusRandom => "atomic+random",
+            StartingWfc::Random => "random",
+            StartingWfc::File => "file",
+        })
+    }
+}
+
+impl Field for Diagonalization {
+    fn value(&self) -> String {
+        String::from(match *self {
+            Diagonalization::David => "david",
+            Diagonalization::Cg => "cg",
+        })
+    }
+}
+
+impl Field for LatticeUnits {
+    fn value(&self) -> String {
+        String::from(match *self {
+            LatticeUnits::Bohr => "bohr",
+            LatticeUnits::Angstrom => "angstrom",
+            LatticeUnits::Alat => "alat",
+        })
+    }
+}
+
+impl Field for PositionCoordinateType {
+    fn value(&self) -> String {
+        String::from(match *self {
+            PositionCoordinateType::AlatCartesian => "alat",
+            PositionCoordinateType::BohrCartesian => "bohr",
+            PositionCoordinateType::AngstromCartesian => "angstrom",
+            PositionCoordinateType::Crystal => "crystal",
+            PositionCoordinateType::CrystalSG => "crystal_sg",
+        })
+    }
+}
+
+impl Field for KPoints {
+    fn value(&self) -> String {
+        String::from(match *self {
+            KPoints::Crystal(_) => "crystal",
+            KPoints::Automatic { .. } => "automatic",
+            KPoints::CrystalBands { .. } => "crystal_b",
         })
     }
 }
