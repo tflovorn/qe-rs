@@ -17,6 +17,7 @@ use std::path::PathBuf;
 ///
 /// When specifying one field necessitates specifying another field, those fields which must
 /// be specified together are bundled such that specifying only one is not possible.
+#[derive(Debug)]
 pub struct Input {
     /// `calculation` specifies the type of calculation (`scf`, `nscf`, etc.) and parameters
     /// specific to that type.
@@ -31,7 +32,6 @@ pub struct Input {
 
     pub electrons: Electrons,
     pub species: Vec<Species>,
-    pub cell_parameters: Cell,
 
     /// For `nscf` and `bands` calculations, the atomic positions are unused: the corresponding
     /// positions from the `scf` calculation are used instead. Here we still require positions to
@@ -41,6 +41,7 @@ pub struct Input {
     pub k_points: KPoints,
 }
 
+#[derive(Debug)]
 pub enum Calculation {
     Scf {
         conv_thr: f64,
@@ -57,20 +58,23 @@ pub enum Calculation {
     },
 }
 
+#[derive(Debug)]
 pub struct Control {
     pub restart_mode: Option<RestartMode>,
     pub disk_io: Option<DiskIO>,
     pub wf_collect: Option<bool>,
     pub pseudo_dir: Option<PathBuf>,
-    pub outdir: Option<PathBuf>,
+    pub out_dir: Option<PathBuf>,
     pub prefix: Option<String>,
 }
 
+#[derive(Debug)]
 pub enum RestartMode {
     FromScratch,
     Restart,
 }
 
+#[derive(Debug)]
 pub enum DiskIO {
     Low,
     Medium,
@@ -78,6 +82,7 @@ pub enum DiskIO {
     NoDiskIO,
 }
 
+#[derive(Debug)]
 pub struct System {
     pub ibrav: Ibrav,
     pub alat: f64,
@@ -98,8 +103,9 @@ pub struct System {
 ///
 /// The "traditional crystallographic constants" A, B, C, cosAB, cosAC, cosBC are not
 /// supported here; these can be rewritten in terms of `celldm`.
+#[derive(Debug)]
 pub enum Ibrav {
-    Free,
+    Free(Cell),
     //SimpleCubic,
     //Fcc,
     //Bcc,
@@ -120,6 +126,7 @@ pub enum Ibrav {
     //Triclinic(f64, f64, f64, f64, f64),
 }
 
+#[derive(Debug)]
 pub enum Occupations {
     /// Each possible type of `Smearing` must come with a `degauss` value giving the
     /// size of the smearing.
@@ -131,6 +138,7 @@ pub enum Occupations {
     //FromInput,
 }
 
+#[derive(Debug)]
 pub enum Smearing {
     Gaussian,
     MethfesselPaxton,
@@ -143,12 +151,14 @@ pub enum Smearing {
 /// `NonPolarized` and `CollinearPolarized` are equivalent to `nspin = 1` and `nspin = 2`
 /// respectively. `NonCollinear(false)` is equivalent to `noncolin = .true.`, `lspinorb = .false.`.
 /// `Noncollinear(true)` is equivalent to `noncolin = .true.`, `lspinorb = .true.`.
+#[derive(Debug)]
 pub enum SpinType {
     NonPolarized,
     CollinearPolarized,
     Noncollinear { spin_orbit: bool },
 }
 
+#[derive(Debug)]
 pub enum Efield {
     TeField {
         dipfield: bool,
@@ -160,17 +170,20 @@ pub enum Efield {
     //LelField,
 }
 
+#[derive(Debug)]
 pub enum LatticeDirection {
     D1,
     D2,
     D3,
 }
 
+#[derive(Debug)]
 pub struct Electrons {
     pub startingwfc: Option<StartingWfc>,
     pub diagonalization: Option<Diagonalization>,
 }
 
+#[derive(Debug)]
 pub enum StartingWfc {
     Atomic,
     AtomicPlusRandom,
@@ -178,33 +191,39 @@ pub enum StartingWfc {
     File,
 }
 
+#[derive(Debug)]
 pub enum Diagonalization {
     David,
     Cg,
 }
 
+#[derive(Debug)]
 pub struct Species {
     pub label: String,
     pub mass: f64,
     pub pseudopotential_filename: String,
 }
 
+#[derive(Debug)]
 pub struct Cell {
     pub units: LatticeUnits,
     pub cell: [[f64; 3]; 3],
 }
 
+#[derive(Debug)]
 pub enum LatticeUnits {
     Bohr,
     Angstrom,
     Alat,
 }
 
+#[derive(Debug)]
 pub struct Positions {
     pub coordinate_type: PositionCoordinateType,
     pub coordinates: Vec<AtomCoordinate>,
 }
 
+#[derive(Debug)]
 pub enum PositionCoordinateType {
     AlatCartesian,
     BohrCartesian,
@@ -213,18 +232,22 @@ pub enum PositionCoordinateType {
     CrystalSG,
 }
 
+#[derive(Debug)]
 pub struct AtomCoordinate {
     pub species: String,
     pub r: [f64; 3],
     pub if_pos: Option<[bool; 3]>,
 }
 
+#[derive(Debug)]
 pub enum KPoints {
     //TwoPiByACartesian(Vec<[f64; 4]>),
     Crystal(Vec<[f64; 4]>),
     Automatic {
-        nk: [f64; 3],
-        sk: [f64; 3],
+        nk: [u64; 3],
+        /// Values of `sk` elements are mapped from `false` to 0 and `true` to 1.
+        /// A value of `None` for `sk` is equivalent to `[false, false, false]`.
+        sk: Option<[bool; 3]>,
     },
     //Gamma,
     //TwoPiByACartesianBands { nk_per_panel: u64, panel_bounds: Vec<f64; 3]> },
