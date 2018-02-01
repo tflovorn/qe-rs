@@ -6,6 +6,8 @@ license = "MIT/Apache-2.0"
 
 [dependencies]
 failure = "*"
+serde = "*"
+serde_derive = "*"
 
 [dev-dependencies]
 pre-commit = "*"
