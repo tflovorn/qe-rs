@@ -1,5 +1,5 @@
-use std::fmt;
 use std::path::PathBuf;
+use error;
 
 /// Representation of the input file for Quantum Espresso 6.2.
 ///
@@ -353,21 +353,4 @@ pub enum Error {
     Species(String),
 }
 
-#[derive(Fail, Debug)]
-pub struct ErrorList {
-    errs: Vec<Error>,
-}
-
-impl fmt::Display for ErrorList {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.errs
-                .iter()
-                .map(|e| format!("{}", e))
-                .collect::<Vec<String>>()
-                .join("\n")
-        )
-    }
-}
+pub type ErrorList = error::ErrorList<Error>;
