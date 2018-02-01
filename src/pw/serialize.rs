@@ -3,9 +3,9 @@ use std::io;
 use std::io::Write;
 use std::fs::File;
 use pw::input;
-use pw::input::{Calculation, Diagonalization, DiskIO, Efield, Ibrav, Input, KPoints,
-                LatticeDirection, LatticeUnits, Occupations, PositionCoordinateType, RestartMode,
-                SpinType, StartingWfc};
+use pw::input::{generate_uniform_kpoints, Calculation, Diagonalization, DiskIO, Efield, Ibrav,
+                Input, KPoints, LatticeDirection, LatticeUnits, Occupations,
+                PositionCoordinateType, RestartMode, SpinType, StartingWfc};
 
 pub fn make_input_file(input: &Input) -> Result<String, Error> {
     input::validate(&input)?;
@@ -239,6 +239,16 @@ fn make_k_points(input: &Input) -> String {
                 lines.push(format!("{} {} {} {}", kw[0], kw[1], kw[2], kw[3]));
             }
         }
+        &KPoints::CrystalUniform(nk) => {
+            let k_points = generate_uniform_kpoints(nk);
+            let weight = 1.0 / (k_points.len() as f64);
+
+            lines.push(format!("{}", k_points.len()));
+
+            for k in k_points {
+                lines.push(format!("{} {} {} {}", k[0], k[1], k[2], weight));
+            }
+        }
         &KPoints::Automatic { nk, sk } => {
             let sk_str = match sk {
                 Some(sk) => render_bool_list(sk),
@@ -415,7 +425,7 @@ impl Field for PositionCoordinateType {
 impl Field for KPoints {
     fn value(&self) -> String {
         String::from(match *self {
-            KPoints::Crystal(_) => "crystal",
+            KPoints::Crystal(_) | KPoints::CrystalUniform(_) => "crystal",
             KPoints::Automatic { .. } => "automatic",
             KPoints::CrystalBands { .. } => "crystal_b",
         })

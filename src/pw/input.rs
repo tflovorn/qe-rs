@@ -41,6 +41,26 @@ pub struct Input {
     pub k_points: KPoints,
 }
 
+/// Generate a list of k-points on a uniform grid, suitable for use in a NSCF calculation
+/// used as input for Wannier90.
+pub fn generate_uniform_kpoints(nk: [u64; 3]) -> Vec<[f64; 3]> {
+    let mut ks = Vec::new();
+
+    for k0 in 0..nk[0] {
+        for k1 in 0..nk[1] {
+            for k2 in 0..nk[2] {
+                ks.push([
+                    (k0 as f64) / (nk[0] as f64),
+                    (k1 as f64) / (nk[1] as f64),
+                    (k2 as f64) / (nk[2] as f64),
+                ]);
+            }
+        }
+    }
+
+    ks
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Calculation {
     Scf {
@@ -54,6 +74,7 @@ pub enum Calculation {
     Bands {
         diago_thr_init: f64,
         nbnd: Option<u64>,
+        // TODO - should we always set `nosym = .true.` for bands? Expect so.
         nosym: Option<bool>,
     },
 }
@@ -243,6 +264,7 @@ pub struct AtomCoordinate {
 pub enum KPoints {
     //TwoPiByACartesian(Vec<[f64; 4]>),
     Crystal(Vec<[f64; 4]>),
+    CrystalUniform([u64; 3]),
     Automatic {
         nk: [u64; 3],
         /// Values of `sk` elements are mapped from `false` to 0 and `true` to 1.
