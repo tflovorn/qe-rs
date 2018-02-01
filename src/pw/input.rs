@@ -17,7 +17,7 @@ use error;
 ///
 /// When specifying one field necessitates specifying another field, those fields which must
 /// be specified together are bundled such that specifying only one is not possible.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Input {
     /// `calculation` specifies the type of calculation (`scf`, `nscf`, etc.) and parameters
     /// specific to that type.
@@ -41,7 +41,7 @@ pub struct Input {
     pub k_points: KPoints,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Calculation {
     Scf {
         conv_thr: f64,
@@ -58,7 +58,7 @@ pub enum Calculation {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Control {
     pub restart_mode: Option<RestartMode>,
     pub disk_io: Option<DiskIO>,
@@ -68,13 +68,13 @@ pub struct Control {
     pub prefix: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RestartMode {
     FromScratch,
     Restart,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DiskIO {
     Low,
     Medium,
@@ -82,7 +82,7 @@ pub enum DiskIO {
     NoDiskIO,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct System {
     pub ibrav: Ibrav,
     pub alat: f64,
@@ -103,7 +103,7 @@ pub struct System {
 ///
 /// The "traditional crystallographic constants" A, B, C, cosAB, cosAC, cosBC are not
 /// supported here; these can be rewritten in terms of `celldm`.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Ibrav {
     Free(Cell),
     //SimpleCubic,
@@ -126,7 +126,7 @@ pub enum Ibrav {
     //Triclinic(f64, f64, f64, f64, f64),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Occupations {
     /// Each possible type of `Smearing` must come with a `degauss` value giving the
     /// size of the smearing.
@@ -138,7 +138,7 @@ pub enum Occupations {
     //FromInput,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Smearing {
     Gaussian,
     MethfesselPaxton,
@@ -151,14 +151,14 @@ pub enum Smearing {
 /// `NonPolarized` and `CollinearPolarized` are equivalent to `nspin = 1` and `nspin = 2`
 /// respectively. `NonCollinear(false)` is equivalent to `noncolin = .true.`, `lspinorb = .false.`.
 /// `Noncollinear(true)` is equivalent to `noncolin = .true.`, `lspinorb = .true.`.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SpinType {
     NonPolarized,
     CollinearPolarized,
     Noncollinear { spin_orbit: bool },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Efield {
     TeField {
         dipfield: bool,
@@ -170,20 +170,20 @@ pub enum Efield {
     //LelField,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LatticeDirection {
     D1,
     D2,
     D3,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Electrons {
     pub startingwfc: Option<StartingWfc>,
     pub diagonalization: Option<Diagonalization>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StartingWfc {
     Atomic,
     AtomicPlusRandom,
@@ -191,39 +191,39 @@ pub enum StartingWfc {
     File,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Diagonalization {
     David,
     Cg,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Species {
     pub label: String,
     pub mass: f64,
     pub pseudopotential_filename: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Cell {
     pub units: LatticeUnits,
     pub cell: [[f64; 3]; 3],
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LatticeUnits {
     Bohr,
     Angstrom,
     Alat,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Positions {
     pub coordinate_type: PositionCoordinateType,
     pub coordinates: Vec<AtomCoordinate>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PositionCoordinateType {
     AlatCartesian,
     BohrCartesian,
@@ -232,14 +232,14 @@ pub enum PositionCoordinateType {
     CrystalSG,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AtomCoordinate {
     pub species: String,
     pub r: [f64; 3],
     pub if_pos: Option<[bool; 3]>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum KPoints {
     //TwoPiByACartesian(Vec<[f64; 4]>),
     Crystal(Vec<[f64; 4]>),
