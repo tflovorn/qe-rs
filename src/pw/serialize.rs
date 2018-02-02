@@ -2,6 +2,7 @@ use std::path::Path;
 use std::io;
 use std::io::Write;
 use std::fs::File;
+use serialize_util::push_bool_field;
 use pw::input;
 use pw::input::{generate_uniform_kpoints, Calculation, Diagonalization, DiskIO, Efield, Ibrav,
                 Input, KPoints, LatticeDirection, LatticeUnits, Occupations,
@@ -70,18 +71,6 @@ fn make_control(input: &Input) -> Result<String, Error> {
 
     lines.push(String::from(" /"));
     Ok(lines.join("\n"))
-}
-
-fn push_bool_field(lines: &mut Vec<String>, name: &str, b: Option<bool>) {
-    if let Some(b) = b {
-        let val = if b {
-            String::from(".true.")
-        } else {
-            String::from(".false.")
-        };
-
-        lines.push(format!("    {}={},", name, val));
-    };
 }
 
 fn make_system(input: &Input) -> String {

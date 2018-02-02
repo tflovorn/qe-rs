@@ -4,7 +4,7 @@ use qe::pw::input;
 use qe::pw::serialize;
 
 #[test]
-fn generate_input() {
+fn generate_pw_input() {
     let calculation = input::Calculation::Scf { conv_thr: 1e-8 };
 
     let control = input::Control {
